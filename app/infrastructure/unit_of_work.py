@@ -1,5 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.auth.repositories import SessionRepository, UserRepository
+
 
 class SqlAlchemyUnitOfWork:
     def __init__(self, factory: async_sessionmaker[AsyncSession]):
@@ -7,6 +9,8 @@ class SqlAlchemyUnitOfWork:
 
     async def __aenter__(self):
         self.session = self.factory()
+        self.users = UserRepository(self.session)
+        self.sessions = SessionRepository(self.session)
         return self
 
     async def commit(self):
