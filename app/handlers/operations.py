@@ -35,7 +35,7 @@ async def ready(request: Request, response: Response):
     if database != "ok" or redis != "ok":
         response.status_code = 503
     return {
-        "status": "ok" if response.status_code == 200 else "unavailable",
+        "status": "ok" if database == redis == "ok" else "unavailable",
         "database": database,
         "rate_limiter": redis,
     }

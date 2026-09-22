@@ -1,0 +1,39 @@
+name: backend
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.6"
+          python-version: "3.13.12"
+          enable-cache: true
+      - run: |
+          uv venv --python 3.13.12
+          . .venv/bin/activate.ps1
+          uv sync --frozen --all-groups
+          uv run ruff check .
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          uv run ruff format --check .
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          uv run pytest -q
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          uv run python -m scripts.setup_local_env
+          uv run python -m scripts.export_openapi
+          git diff --exit-code docs/openapi.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - run: |
+          docker compose up -d --build --wait
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          . .venv/bin/activate.ps1
+          $env:SMOKE_PASSWORD = [guid]::NewGuid().ToString()
+          $env:SMOKE_PASSWORD | docker compose exec -T api python -m scripts.seed_demo --password-stdin
+          uv run pytest -q tests/smoke
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - if: always()
+        run: docker compose down

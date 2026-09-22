@@ -12,6 +12,7 @@ from app.employees.handlers import router as employee_router
 from app.handlers.errors import register_error_handlers
 from app.handlers.middleware import TransportMiddleware
 from app.handlers.observability import ObservabilityMiddleware
+from app.handlers.openapi import install_openapi
 from app.handlers.operations import router as operations_router
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.logging import configure_logging
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(project_router)
     app.include_router(operations_router)
     register_error_handlers(app)
+    install_openapi(app, settings)
     app.add_middleware(ObservabilityMiddleware, settings=settings, metrics=metrics)
     app.add_middleware(TransportMiddleware, trusted_hosts=settings.trusted_hosts)
 
