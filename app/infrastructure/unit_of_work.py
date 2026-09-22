@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.auth.repositories import SessionRepository, UserRepository
 from app.companies.repositories import AccessRepository, CompanyRepository
 from app.employees.repositories import EmployeeRepository
+from app.projects.repositories import AssignmentRepository, ProjectRepository
 
 
 class SqlAlchemyUnitOfWork:
@@ -16,6 +17,8 @@ class SqlAlchemyUnitOfWork:
         self.companies = CompanyRepository(self.session)
         self.company_access = AccessRepository(self.session)
         self.employees = EmployeeRepository(self.session)
+        self.projects = ProjectRepository(self.session)
+        self.project_assignments = AssignmentRepository(self.session)
         return self
 
     async def commit(self):

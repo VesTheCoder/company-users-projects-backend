@@ -13,6 +13,7 @@ from app.handlers.middleware import TransportMiddleware
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.rate_limit import RateLimiter
 from app.infrastructure.redis import create_redis
+from app.projects.handlers import router as project_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -52,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(company_router)
     app.include_router(employee_router)
+    app.include_router(project_router)
     register_error_handlers(app)
     app.add_middleware(TransportMiddleware, trusted_hosts=settings.trusted_hosts)
 
