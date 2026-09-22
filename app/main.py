@@ -1,0 +1,112 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
+
+from app.auth.handlers import router as auth_router
+from app.auth.passwords import PasswordHasherService
+from app.companies.handlers import router as company_router
+from app.employees.handlers import router as employee_router
+from app.handlers.errors import register_error_handlers
+from app.handlers.middleware import TransportMiddleware
+from app.handlers.observability import ObservabilityMiddleware
+from app.handlers.openapi import install_openapi
+from app.handlers.operations import router as operations_router
+from app.infrastructure.database import create_engine, create_session_factory
+from app.infrastructure.logging import configure_logging
+from app.infrastructure.metrics import Metrics
+from app.infrastructure.rate_limit import RateLimiter
+from app.infrastructure.redis import create_redis
+from app.projects.handlers import router as project_router
+from app.settings import Settings
+
+
+def create_app(settings: Settings | None = None) -> CORSMiddleware:
+    settings = settings or Settings()
+    configure_logging(settings.log_level)
+    metrics = Metrics()
+    metrics_token = (
+        Path(settings.metrics_bearer_token_file).read_text().strip()
+        if settings.metrics_bearer_token_file
+        else None
+    )
+    if settings.metrics_bearer_token_file and not metrics_token:
+        raise ValueError("Metrics token file must not be empty")
+
+    @asynccontextmanager
+    async def lifespan(app):
+        engine = create_engine(settings, metrics=metrics)
+        metrics.instrument_engine(
+            engine, settings.db_pool_size + settings.db_max_overflow
+        )
+        redis = create_redis(settings)
+        app.state.session_factory = create_session_factory(engine)
+        app.state.engine = engine
+        app.state.redis = redis
+        limiter = RateLimiter(
+            settings.redis_rate_limit_url.get_secret_value(),
+            settings.rate_limit_key_secret.get_secret_value(),
+        )
+        app.state.limiter = limiter
+        passwords = PasswordHasherService(settings.password_hash_concurrency)
+        await passwords.initialize()
+        app.state.passwords = passwords
+        try:
+            yield
+        finally:
+            await limiter.close()
+            await redis.aclose()
+            await engine.dispose()
+
+    app = FastAPI(
+        title="Company Management API",
+        version="1.0.0",
+        lifespan=lifespan,
+        docs_url="/docs" if settings.docs_enabled else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if settings.docs_enabled else None,
+    )
+    app.state.settings = settings
+    app.state.metrics = metrics
+    app.state.metrics_token = metrics_token
+    app.include_router(auth_router)
+    app.include_router(company_router)
+    app.include_router(employee_router)
+    app.include_router(project_router)
+    app.include_router(operations_router)
+    register_error_handlers(app)
+    install_openapi(app, settings)
+    app.add_middleware(ObservabilityMiddleware, settings=settings, metrics=metrics)
+    app.add_middleware(TransportMiddleware, trusted_hosts=settings.trusted_hosts)
+
+    wrapped = CORSMiddleware(
+        app,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Accept",
+            "Content-Type",
+            "X-CSRF-Token",
+            "X-CSRF-Protection",
+            "X-Request-ID",
+            "If-Match",
+            "Idempotency-Key",
+        ],
+        expose_headers=[
+            "X-Request-ID",
+            "ETag",
+            "Location",
+            "RateLimit-Limit",
+            "RateLimit-Remaining",
+            "RateLimit-Reset",
+            "Retry-After",
+        ],
+        max_age=600,
+    )
+    wrapped.state = app.state
+    wrapped.router = app.router
+    wrapped.openapi = app.openapi
+    wrapped.title = app.title
+    return wrapped
