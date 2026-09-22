@@ -15,7 +15,6 @@ jobs:
           enable-cache: true
       - run: |
           uv venv --python 3.13.12
-          . .venv/bin/activate.ps1
           uv sync --frozen --all-groups
           uv run ruff check .
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -30,9 +29,9 @@ jobs:
       - run: |
           docker compose up -d --build --wait
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          . .venv/bin/activate.ps1
-          $env:SMOKE_PASSWORD = [guid]::NewGuid().ToString()
-          $env:SMOKE_PASSWORD | docker compose exec -T api python -m scripts.seed_demo --password-stdin
+          $env:DEMO_PASSWORD = [guid]::NewGuid().ToString()
+          $env:SMOKE_PASSWORD = $env:DEMO_PASSWORD
+          docker compose exec -T -e DEMO_PASSWORD=$env:DEMO_PASSWORD api python -m scripts.seed_demo
           uv run pytest -q tests/smoke
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - if: always()

@@ -1,7 +1,5 @@
-import argparse
 import asyncio
 from datetime import date
-from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import delete
@@ -13,7 +11,7 @@ from app.companies.models import Company, CompanyAccess
 from app.employees.models import Employee
 from app.projects.models import Project, ProjectEmployee
 from app.settings import Settings
-from scripts.common import operational_uow, read_password
+from scripts.common import operational_uow
 
 
 def demo_id(number: int) -> UUID:
@@ -131,18 +129,9 @@ async def seed_business(uow):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Seed deterministic development records"
-    )
-    parser.add_argument("--password-stdin", action="store_true")
-    args = parser.parse_args()
     settings = Settings()
     require_demo_environment(settings)
-    password = (
-        Path(settings.demo_password_file).read_text().rstrip("\r\n")
-        if settings.demo_password_file
-        else read_password(args.password_stdin)
-    )
+    password = settings.demo_password.get_secret_value()
 
     async def run():
         hashed = await PasswordHasherService().hash(password)

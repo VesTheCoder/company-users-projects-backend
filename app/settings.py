@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     metrics_enabled: bool = True
     metrics_bearer_token_file: str | None = None
     allow_demo_seed: bool = False
-    demo_password_file: str | None = None
+    demo_password: SecretStr | None = None
     log_level: str = "INFO"
     problem_type_base_uri: str = "https://api.example.com/problems"
 
