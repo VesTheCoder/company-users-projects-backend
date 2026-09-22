@@ -7,6 +7,7 @@ from app.config import Settings
 from app.handlers.errors import register_error_handlers
 from app.handlers.middleware import TransportMiddleware
 from app.infrastructure.database import create_engine, create_session_factory
+from app.infrastructure.rate_limit import RateLimiter
 from app.infrastructure.redis import create_redis
 
 
@@ -20,9 +21,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.session_factory = create_session_factory(engine)
         app.state.engine = engine
         app.state.redis = redis
+        limiter = RateLimiter(
+            settings.redis_rate_limit_url.get_secret_value(),
+            settings.rate_limit_key_secret.get_secret_value(),
+        )
+        app.state.limiter = limiter
         try:
             yield
         finally:
+            await limiter.close()
             await redis.aclose()
             await engine.dispose()
 
