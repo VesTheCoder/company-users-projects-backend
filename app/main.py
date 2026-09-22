@@ -1,8 +1,11 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from app.config import Settings
+from app.handlers.errors import register_error_handlers
+from app.handlers.middleware import TransportMiddleware
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.redis import create_redis
 
@@ -32,4 +35,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if settings.docs_enabled else None,
     )
     app.state.settings = settings
-    return app
+    register_error_handlers(app)
+    app.add_middleware(TransportMiddleware, trusted_hosts=settings.trusted_hosts)
+
+    @app.get("/health/live", tags=["Operations"])
+    async def live():
+        return {"status": "ok"}
+
+    wrapped = CORSMiddleware(
+        app,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Accept",
+            "Content-Type",
+            "X-CSRF-Token",
+            "X-CSRF-Protection",
+            "X-Request-ID",
+            "If-Match",
+            "Idempotency-Key",
+        ],
+        expose_headers=[
+            "X-Request-ID",
+            "ETag",
+            "Location",
+            "RateLimit-Limit",
+            "RateLimit-Remaining",
+            "RateLimit-Reset",
+            "Retry-After",
+        ],
+        max_age=600,
+    )
+    wrapped.state = app.state
+    wrapped.router = app.router
+    wrapped.openapi = app.openapi
+    wrapped.title = app.title
+    return wrapped
