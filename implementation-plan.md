@@ -157,7 +157,7 @@ API container не хранит durable state:
 | PostgreSQL driver | **asyncpg** | Native async PostgreSQL driver для SQLAlchemy URL `postgresql+asyncpg`. Alembic использует AsyncEngine и официальный `run_sync` recipe. [asyncpg](https://magicstack.github.io/asyncpg/current/), [SQLAlchemy asyncpg dialect](https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#asyncpg), [Alembic asyncio recipe](https://alembic.sqlalchemy.org/en/latest/cookbook.html#using-asyncio-with-alembic) |
 | Database | **PostgreSQL 18.6** | Версия Docker image фиксируется явно для одинаковой local/CI среды. [PostgreSQL versioning](https://www.postgresql.org/support/versioning/), [18.6 release notes](https://www.postgresql.org/docs/release/18.6/), [official image tags](https://hub.docker.com/_/postgres/tags) |
 | Migrations | **Alembic** | Schema management остается единственным через Alembic; async engine используется через `run_sync`. [Alembic](https://alembic.sqlalchemy.org/en/latest/front.html) |
-| Validation/config | **Pydantic**, **pydantic-settings** | Settings валидирует origins, production security flags и secrets при startup. [Pydantic](https://docs.pydantic.dev/latest/), [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) |
+| Configuration | **Pydantic**, **pydantic-settings** | Settings загружает и типизирует переменные окружения; корректность deployment-конфигурации обеспечивает разработчик. [Pydantic](https://docs.pydantic.dev/latest/), [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) |
 | Password hashing | **argon2-cffi** | Argon2id, `check_needs_rehash`; hashing/verification выносятся из event loop и ограничиваются concurrency limiter. [argon2-cffi](https://argon2-cffi.readthedocs.io/en/stable/api.html), [RFC 9106](https://www.rfc-editor.org/rfc/rfc9106.html#section-4) |
 | Redis server | **Redis 8.10.2** | Docker image фиксируется явно; используются AOF+RDB и `noeviction`. [Redis release notes](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/), [official image tags](https://github.com/docker-library/official-images/blob/master/library/redis) |
 | Redis client | **redis** | Используется встроенный async API `redis.asyncio`; отдельный `hiredis` dependency не добавляется. [redis-py async client](https://redis.io/docs/latest/develop/clients/redis-py/async/) |
@@ -188,7 +188,7 @@ Docker images фиксируются выбранными tags: `python:3.13.12-
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
-│   ├── config.py
+│   ├── settings.py
 │   ├── exceptions/
 │   │   ├── __init__.py
 │   │   ├── base.py
@@ -304,7 +304,7 @@ Docker images фиксируются выбранными tags: `python:3.13.12-
 - `infrastructure/` содержит database/Redis/ORM/logging/metrics adapters; `utils/` допускается только для небольших переиспользуемых pure helpers (`cursor`, normalization, crypto).
 - `infrastructure/unit_of_work.py` содержит concrete `SqlAlchemyUnitOfWork`: один `AsyncSession`, набор feature-specific repositories, явные `commit`/rollback/close. UOW используется на границе use case, а не как скрытая глобальная транзакция.
 - `main.py` является единственной точкой сборки FastAPI-приложения; application composition не выделяется в отдельный модуль, а administrative commands остаются независимыми `scripts/*.py`.
-- Операционные команды находятся в независимых `scripts/*.py` и повторно используют те же `services.py`, `repositories.py` и `config.py`; demo seed не смешивается с account provisioning.
+- Операционные команды находятся в независимых `scripts/*.py` и повторно используют те же `services.py`, `repositories.py` и `settings.py`; demo seed не смешивается с account provisioning.
 - Shared ORM mixins сокращают повторение UUID/timestamps/version, но не скрывают tenant rules.
 - Между features используются небольшие application contracts, а не прямое обращение к чужим handlers.
 
@@ -1061,8 +1061,9 @@ Production account commands независимы от seed и доступны �
 | `DB_PASSWORD` | PostgreSQL secret | required | `<runtime-secret>` |
 | `DB_MIGRATION_USER` | Alembic/migrations | required by migration process | `company_app_migrator` |
 | `DB_MIGRATION_PASSWORD` | Alembic/migrations secret | required by migration process | `<migration-secret>` |
-| `POSTGRES_SUPERUSER` | local PostgreSQL bootstrap | required only for an empty local volume | `postgres_admin` |
-| `POSTGRES_SUPERUSER_PASSWORD` | local PostgreSQL bootstrap secret | required only for an empty local volume | `<bootstrap-secret>` |
+| `POSTGRES_USER` | local PostgreSQL bootstrap | required only for an empty local volume | `postgres_admin` |
+| `POSTGRES_PASSWORD` | local PostgreSQL bootstrap secret | required only for an empty local volume | `<bootstrap-secret>` |
+| `POSTGRES_DB` | local PostgreSQL bootstrap database | required only for an empty local volume | `company_app` |
 | `DB_SSLMODE` | PostgreSQL | `disable` local, `verify-full` production | `verify-full` |
 | `DB_URL` | SQLAlchemy derived setting | never supplied independently; built once per process from the DB components above | `postgresql+asyncpg://<user>:<password>@postgres:5432/company_app` |
 | `DB_POOL_SIZE` | DB pool | API `10` | `10` |
@@ -1074,22 +1075,14 @@ Production account commands независимы от seed и доступны �
 | `RATE_LIMIT_KEY_SECRET` | limiter | required, ≥32 random bytes | `<base64-secret>` |
 | `CURSOR_SIGNING_KEY` | pagination | required, ≥32 random bytes | `<base64-secret>` |
 | `PASSWORD_HASH_CONCURRENCY` | auth | default `2` | `2` |
-| `DOCS_ENABLED` | API docs | true dev/test, false production | `false` |
-| `METRICS_ENABLED` | metrics | true local, false-by-default production | `true` |
+| `DOCS_ENABLED` | API docs | default `true`; production sets `false` explicitly | `false` |
+| `METRICS_ENABLED` | metrics | default `true`; production sets `false` explicitly | `true` |
 | `METRICS_BEARER_TOKEN_FILE` | metrics security | required if public network exposure enabled | `/run/secrets/metrics_token` |
 | `ALLOW_DEMO_SEED` | seeder | default `false` | `false` |
 | `DEMO_PASSWORD_FILE` | seeder secret | optional protected file | `/run/secrets/demo_password` |
 | `PROBLEM_TYPE_BASE_URI` | errors | required production | `https://api.example.com/problems` |
 
-Startup validation rejects:
-
-- production localhost CORS origin unless explicitly allowed by deployment policy;
-- wildcard origins;
-- production `COOKIE_SECURE=false`;
-- missing secrets;
-- malformed Redis/DB URLs;
-- proxy wildcard `*` unless an explicit isolated-network override is set;
-- same secret reused for limiter and cursor.
+`Settings` выполняет только загрузку и преобразование типов. Корректные origins, secrets, database/Redis endpoints и production flags задаются разработчиком в deployment environment.
 
 `.env.example` содержит placeholders, но не рабочие credentials.
 
@@ -1349,14 +1342,14 @@ Performance results сохраняют:
 
 - **Outcome:** validated settings, один engine/session factory per process и concrete Unit of Work для коротких transactions.
 - **Dependencies:** Step 1.
-- **Files:** `app/config.py`, `app/main.py`, `app/infrastructure/database.py`, `app/infrastructure/unit_of_work.py`, `app/infrastructure/redis.py`.
+- **Files:** `app/settings.py`, `app/main.py`, `app/infrastructure/database.py`, `app/infrastructure/unit_of_work.py`, `app/infrastructure/redis.py`.
 - **Contracts:** `Settings`; derived `database_url` for runtime roles and `migration_database_url` for Alembic; `create_engine(settings)`; `get_session_factory()`; `get_uow()`; `SqlAlchemyUnitOfWork`; lifespan-owned cleanup; Redis client. HTTP handlers obtain a UOW; the UOW obtains sessions from the factory, while repositories never create or commit sessions themselves.
 - **Migrations/endpoints:** нет.
 - **Tests:** URL escaping; production security validation; API pool profile; engine disposal; UOW commit/rollback/close; repositories share one session and never commit independently.
 - **Verification:**
 
   ```text
-  uv run pytest -q tests/unit/test_config.py tests/unit/test_db.py tests/integration/test_uow.py
+  uv run pytest -q tests/unit/test_settings.py tests/unit/test_uow.py tests/integration/test_pool.py
   ```
 
 - **Complete when:** invalid production config fails before serving; no module-level connection/session is shared across processes; a failed use case rolls back all writes and a successful one commits them once through UOW.

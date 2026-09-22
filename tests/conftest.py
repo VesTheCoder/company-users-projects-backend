@@ -10,10 +10,10 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
 from app.auth.accounts import create_user
 from app.auth.schemas import AccountCreate
-from app.config import Settings
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 from app.main import create_app
+from app.settings import Settings
 
 
 @pytest.fixture

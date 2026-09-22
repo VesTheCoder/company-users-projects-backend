@@ -10,9 +10,9 @@ from sqlalchemy import select
 
 from app.auth.models import User
 from app.auth.passwords import PasswordHasherService
-from app.config import Settings
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from app.settings import Settings
 from scripts.common import read_password
 from scripts.load_dataset import COLUMNS, PROFILES, dataset_rows, load_id, session_pool
 from scripts.seed_demo import require_demo_environment

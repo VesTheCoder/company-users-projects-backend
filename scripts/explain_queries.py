@@ -5,8 +5,8 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from app.config import Settings
 from app.infrastructure.database import create_engine
+from app.settings import Settings
 from app.utils.security import hash_token
 from scripts.load_dataset import load_id, session_material
 

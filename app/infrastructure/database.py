@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.config import Settings
 from app.infrastructure.metrics import observed_pool_class
+from app.settings import Settings
 
 
 def create_engine(

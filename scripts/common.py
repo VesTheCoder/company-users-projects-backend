@@ -2,9 +2,9 @@ import getpass
 import sys
 from contextlib import asynccontextmanager
 
-from app.config import Settings
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from app.settings import Settings
 
 
 def read_password(from_stdin: bool) -> str:

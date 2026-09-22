@@ -5,8 +5,8 @@ import httpx
 import pytest
 from sqlalchemy import text
 
-from app.config import Settings
 from app.infrastructure.database import create_engine
+from app.settings import Settings
 
 
 def test_docker_login_crud_and_logout():

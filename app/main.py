@@ -7,7 +7,6 @@ from starlette.middleware.cors import CORSMiddleware
 from app.auth.handlers import router as auth_router
 from app.auth.passwords import PasswordHasherService
 from app.companies.handlers import router as company_router
-from app.config import Settings
 from app.employees.handlers import router as employee_router
 from app.handlers.errors import register_error_handlers
 from app.handlers.middleware import TransportMiddleware
@@ -20,6 +19,7 @@ from app.infrastructure.metrics import Metrics
 from app.infrastructure.rate_limit import RateLimiter
 from app.infrastructure.redis import create_redis
 from app.projects.handlers import router as project_router
+from app.settings import Settings
 
 
 def create_app(settings: Settings | None = None) -> CORSMiddleware:

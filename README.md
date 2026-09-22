@@ -4,19 +4,17 @@ Async FastAPI modular monolith for companies, independent employee records, proj
 
 ## Run with Docker
 
-Requires Docker Compose and Python 3.13.12 with uv for local tooling. Commands below use PowerShell.
+Requires Docker Compose. Python 3.13.12 with uv is needed only for local tooling. Commands below use PowerShell.
+
+Create `.env` from `.env.sample` and fill in the credentials before starting the containers. The API is intended to run through Docker Compose; its database and Redis endpoints use the Compose service names from `.env`.
 
 ```powershell
-uv venv --python 3.13.12
-. .venv/Scripts/Activate.ps1
-uv sync --frozen --all-groups
-uv run python -m scripts.setup_local_env
 docker compose up -d --build
 docker compose exec api python -m scripts.seed_demo
 Invoke-RestMethod http://localhost:8080/health/ready
 ```
 
-The environment setup command creates `.env` with random local credentials and refuses to overwrite an existing file. `.env.sample` is the placeholder template, following the repository coding rules. The plan calls this template `.env.example`; its purpose is identical. No working credentials are committed.
+The environment setup command `uv run python -m scripts.setup_local_env` can generate `.env` with random local credentials and refuses to overwrite an existing file. `.env.sample` is the placeholder template, following the repository coding rules. No working credentials are committed.
 
 The seeder asks for a password of 12–1024 characters using hidden input. Demo logins are `owner@demo.example`, `admin@demo.example`, `viewer@demo.example`, and `outsider@demo.example`. The chosen password applies to all four. Re-running the seed resets the known demo dataset and revokes demo sessions. It requires `APP_ENV=development` and `ALLOW_DEMO_SEED=true`.
 
@@ -28,17 +26,15 @@ The seeder asks for a password of 12–1024 characters using hidden input. Demo 
 
 Compose waits for PostgreSQL and Redis health, applies Alembic migrations once, then starts the API. PostgreSQL and Redis use named volumes. The bootstrap shell script creates runtime/migration roles only on an empty PostgreSQL volume. Changing role passwords in `.env` does not update an existing database; use an operator-controlled `ALTER ROLE` for existing volumes.
 
-## Local development and tests
+## Tooling and tests
 
 ```powershell
 . .venv/Scripts/Activate.ps1
 uv sync --frozen --all-groups
-docker compose up -d postgres redis
-uv run alembic upgrade head
-uv run uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8080 --no-proxy-headers --no-access-log
+docker compose up -d --build
 ```
 
-Stop the Compose API before starting a local API on the same port. The checked-in runtime pin, CI and Docker all use Python 3.13.12. Dependency versions are recorded in `uv.lock`; upgrades are explicit.
+The API and migrations run in Compose containers. The checked-in runtime pin, CI and Docker all use Python 3.13.12. Dependency versions are recorded in `uv.lock`; upgrades are explicit.
 
 ```powershell
 . .venv/Scripts/Activate.ps1
@@ -92,7 +88,7 @@ Runtime database credentials have DML permissions only. Migration credentials ar
 
 Compose is a local demonstration deployment. Production requires verified PostgreSQL TLS (`DB_SSLMODE=verify-full`), secure cookies, exact public HTTPS origins and trusted hosts, managed secrets and a reverse proxy that strips client forwarding headers. Publish frontend and `/api` under one HTTPS origin. Unrelated-site cookie deployment is unsupported. Set `DOCS_ENABLED=false` and `METRICS_ENABLED=false` on public ingress; protected metrics require `METRICS_BEARER_TOKEN_FILE` and a Bearer token.
 
-Override the API command behind the proxy to include `--proxy-headers --forwarded-allow-ips <exact-proxy-CIDRs>`. Local Compose explicitly disables proxy-header trust. Database and Redis host ports bind to loopback for local tooling; production should use private endpoints, Redis authentication/TLS and network restrictions. Replace the local Compose Redis URL for a managed endpoint.
+Override the API command behind the proxy to include `--proxy-headers --forwarded-allow-ips <exact-proxy-CIDRs>`. Local Compose explicitly disables proxy-header trust and keeps PostgreSQL and Redis internal to the Compose network. Production should use private endpoints, Redis authentication/TLS and network restrictions.
 
 Each API process has a 10-connection pool plus 5 overflow, 5-second checkout/statement timeouts and a 2-second lock timeout. Four replicas plus two operational connections use at most 62 of the 80-connection application budget. More replicas require smaller pools or measured adoption of PgBouncer. Writes within one company serialize through a company row lock to preserve access and lifecycle invariants; hot write-heavy tenants are a known scaling limit.
 

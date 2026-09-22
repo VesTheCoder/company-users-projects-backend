@@ -10,9 +10,9 @@ from sqlalchemy.dialects.postgresql import insert
 from app.auth.models import User
 from app.auth.passwords import PasswordHasherService
 from app.companies.models import Company, CompanyAccess
-from app.config import Settings
 from app.employees.models import Employee
 from app.projects.models import Project, ProjectEmployee
+from app.settings import Settings
 from scripts.common import operational_uow, read_password
 
 
