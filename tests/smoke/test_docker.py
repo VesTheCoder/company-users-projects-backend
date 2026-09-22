@@ -3,6 +3,10 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from sqlalchemy import text
+
+from app.config import Settings
+from app.infrastructure.database import create_engine
 
 
 def test_docker_login_crud_and_logout():
@@ -36,3 +40,22 @@ def test_docker_login_crud_and_logout():
             == 204
         )
         assert client.post("/api/v1/auth/logout").status_code == 204
+
+
+async def test_runtime_database_role_has_no_schema_creation_privilege():
+    if not os.environ.get("SMOKE_PASSWORD"):
+        pytest.skip("Compose smoke environment is not enabled")
+    engine = create_engine(Settings())
+    try:
+        async with engine.connect() as connection:
+            assert not await connection.scalar(
+                text("SELECT has_schema_privilege(current_user, 'public', 'CREATE')")
+            )
+            assert await connection.scalar(
+                text(
+                    "SELECT has_table_privilege(current_user, 'users', "
+                    "'SELECT,INSERT,UPDATE,DELETE')"
+                )
+            )
+    finally:
+        await engine.dispose()
