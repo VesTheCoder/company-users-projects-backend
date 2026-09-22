@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
+from app.auth.handlers import router as auth_router
+from app.auth.passwords import PasswordHasherService
 from app.config import Settings
 from app.handlers.errors import register_error_handlers
 from app.handlers.middleware import TransportMiddleware
@@ -26,6 +28,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.rate_limit_key_secret.get_secret_value(),
         )
         app.state.limiter = limiter
+        passwords = PasswordHasherService(settings.password_hash_concurrency)
+        await passwords.initialize()
+        app.state.passwords = passwords
         try:
             yield
         finally:
@@ -42,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if settings.docs_enabled else None,
     )
     app.state.settings = settings
+    app.include_router(auth_router)
     register_error_handlers(app)
     app.add_middleware(TransportMiddleware, trusted_hosts=settings.trusted_hosts)
 
