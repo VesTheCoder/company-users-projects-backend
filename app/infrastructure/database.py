@@ -2,10 +2,15 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.config import Settings
+from app.infrastructure.metrics import observed_pool_class
 
 
 def create_engine(
-    settings: Settings, *, operational: bool = False, migration: bool = False
+    settings: Settings,
+    *,
+    operational: bool = False,
+    migration: bool = False,
+    metrics=None,
 ):
     options = (
         {"poolclass": NullPool}
@@ -17,6 +22,8 @@ def create_engine(
             "pool_recycle": 1800,
         }
     )
+    if metrics is not None and not operational and not migration:
+        options["poolclass"] = observed_pool_class(metrics)
     return create_async_engine(
         settings.migration_database_url if migration else settings.database_url,
         pool_pre_ping=True,

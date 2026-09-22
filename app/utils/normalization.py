@@ -1,8 +1,12 @@
 import unicodedata
 
 
-def normalize_text(value: str) -> str:
-    return unicodedata.normalize("NFKC", value).strip()
+def normalize_text(value):
+    return (
+        unicodedata.normalize("NFKC", value).strip()
+        if isinstance(value, str)
+        else value
+    )
 
 
 def normalize_identifier(value: str) -> str:

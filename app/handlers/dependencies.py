@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends, Request, Response
+from structlog.contextvars import bind_contextvars
 
 from app.auth.csrf import validate_csrf, validate_origin
 from app.auth.domain import CurrentPrincipal
@@ -30,6 +31,7 @@ async def current_principal(request: Request, response: Response, uow: Uow):
         validate_origin(request.headers, settings)
         validate_csrf(request.headers, principal.csrf_token)
     request.state.actor_user_id = principal.user_id
+    bind_contextvars(actor_user_id=str(principal.user_id))
     return principal
 
 

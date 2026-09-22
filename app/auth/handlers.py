@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, Response
 from sqlalchemy import func, update
+from structlog.contextvars import bind_contextvars
 
 from app.auth.csrf import validate_login_csrf
 from app.auth.models import AuthSession
@@ -35,6 +36,7 @@ async def login_handler(
         security_event("auth.login.failed")
         raise
     request.state.actor_user_id = result.user.id
+    bind_contextvars(actor_user_id=str(result.user.id))
     security_event("auth.login.succeeded")
     response.set_cookie(
         settings.cookie_name,

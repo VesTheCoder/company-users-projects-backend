@@ -5,10 +5,12 @@ from uuid import UUID
 from email_validator import EmailNotValidError, validate_email
 from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 
-from app.utils.normalization import normalize_text
+from app.utils.normalization import normalize_identifier, normalize_text
 
 
 def validate_login(value: str) -> str:
+    if len(normalize_identifier(value)) > 254:
+        raise ValueError("Normalized login is too long")
     try:
         validate_email(value, check_deliverability=False, test_environment=True)
     except EmailNotValidError as error:

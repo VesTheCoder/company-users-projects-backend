@@ -3,6 +3,7 @@ from time import perf_counter
 import structlog
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 from sqlalchemy import event
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 
 class Metrics:
@@ -37,6 +38,14 @@ class Metrics:
         self.pool_capacity = Gauge(
             "db_pool_capacity", "Maximum pool connections", registry=self.registry
         )
+        self.pool_waiting = Gauge(
+            "db_pool_acquiring", "Tasks acquiring a connection", registry=self.registry
+        )
+        self.pool_wait = Histogram(
+            "db_pool_acquire_seconds",
+            "Connection acquisition time",
+            registry=self.registry,
+        )
         self.slow_queries = Counter(
             "db_slow_queries_total", "Queries slower than 250ms", registry=self.registry
         )
@@ -59,3 +68,17 @@ class Metrics:
                     operation=statement.split()[0],
                     duration_ms=round(duration * 1000, 2),
                 )
+
+
+def observed_pool_class(metrics):
+    class ObservedPool(AsyncAdaptedQueuePool):
+        def _do_get(self):
+            started = perf_counter()
+            metrics.pool_waiting.inc()
+            try:
+                return super()._do_get()
+            finally:
+                metrics.pool_waiting.dec()
+                metrics.pool_wait.observe(perf_counter() - started)
+
+    return ObservedPool

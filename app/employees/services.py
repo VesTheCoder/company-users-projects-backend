@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from pydantic import ValidationError
 from sqlalchemy import delete, update
 from sqlalchemy.exc import IntegrityError
@@ -19,15 +21,21 @@ def employee_values(data):
     return values
 
 
-async def persist_employee(uow, employee):
+@contextmanager
+def employee_conflicts():
     try:
-        await uow.session.flush()
+        yield
     except IntegrityError as error:
         if "uq_employee_company_email" in str(error.orig):
             raise AppError(
                 409, "work_email_exists", "Work email already exists in this company."
             ) from error
         raise
+
+
+async def persist_employee(uow, employee):
+    with employee_conflicts():
+        await uow.session.flush()
     await uow.session.refresh(employee)
     result = EmployeeRead.model_validate(employee)
     await uow.commit()
@@ -54,15 +62,16 @@ async def update_employee(uow, principal, company_id, employee_id, data, version
         raise AppError(
             422, "validation_error", "Employee status and dates are inconsistent."
         ) from error
-    await uow.session.execute(
-        update(Employee)
-        .where(
-            Employee.company_id == company_id,
-            Employee.id == employee_id,
-            Employee.version == version,
+    with employee_conflicts():
+        await uow.session.execute(
+            update(Employee)
+            .where(
+                Employee.company_id == company_id,
+                Employee.id == employee_id,
+                Employee.version == version,
+            )
+            .values(**employee_values(validated), version=version + 1)
         )
-        .values(**employee_values(validated), version=version + 1)
-    )
     if validated.status == "terminated":
         await uow.session.execute(
             delete(ProjectEmployee).where(

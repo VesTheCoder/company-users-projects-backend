@@ -63,7 +63,8 @@ async def seed_demo(settings, password_hash: str):
 async def seed_access(uow):
     await uow.session.execute(
         delete(CompanyAccess).where(
-            CompanyAccess.company_id.in_([demo_id(101), demo_id(102)])
+            CompanyAccess.company_id.in_([demo_id(101), demo_id(102)]),
+            CompanyAccess.user_id.in_([demo_id(i) for i in range(1, 5)]),
         )
     )
     for company, user, role in [
@@ -114,7 +115,8 @@ async def seed_business(uow):
         )
     await uow.session.execute(
         delete(ProjectEmployee).where(
-            ProjectEmployee.company_id.in_([demo_id(101), demo_id(102)])
+            ProjectEmployee.company_id.in_([demo_id(101), demo_id(102)]),
+            ProjectEmployee.employee_id.in_([demo_id(i) for i in range(201, 205)]),
         )
     )
     for company, project, employee, user in [(101, 301, 201, 1), (102, 302, 204, 4)]:

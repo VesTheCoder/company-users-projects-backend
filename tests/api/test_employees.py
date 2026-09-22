@@ -47,3 +47,23 @@ async def test_employee_validation_rejects_mass_assignment(authenticated):
         json={"full_name": "Test", "start_date": "2026-01-01", "version": 100},
     )
     assert response.status_code == 422
+
+
+async def test_employee_update_reports_email_conflict(authenticated):
+    company = (
+        await authenticated.post("/api/v1/companies", json={"name": "Email update"})
+    ).headers["location"]
+    data = {"full_name": "Worker", "start_date": "2026-01-01"}
+    await authenticated.post(
+        company + "/employees", json=data | {"work_email": "first@example.com"}
+    )
+    second = await authenticated.post(
+        company + "/employees", json=data | {"work_email": "second@example.com"}
+    )
+    response = await authenticated.patch(
+        second.headers["location"],
+        json={"work_email": "FIRST@example.com"},
+        headers={"If-Match": '"v1"'},
+    )
+    assert response.status_code == 409
+    assert response.json()["code"] == "work_email_exists"

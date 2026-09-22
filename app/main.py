@@ -22,7 +22,7 @@ from app.infrastructure.redis import create_redis
 from app.projects.handlers import router as project_router
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None) -> CORSMiddleware:
     settings = settings or Settings()
     configure_logging(settings.log_level)
     metrics = Metrics()
@@ -36,7 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app):
-        engine = create_engine(settings)
+        engine = create_engine(settings, metrics=metrics)
         metrics.instrument_engine(
             engine, settings.db_pool_size + settings.db_max_overflow
         )
