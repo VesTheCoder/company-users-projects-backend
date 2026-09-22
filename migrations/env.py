@@ -3,12 +3,13 @@ import asyncio
 from alembic import context
 
 from app.auth.models import AuthSession, User
+from app.companies.models import Company, CompanyAccess
 from app.config import Settings
 from app.infrastructure.database import create_engine
 from app.infrastructure.orm.base import Base
 
 target_metadata = Base.metadata
-registered_models = (User, AuthSession)
+registered_models = (User, AuthSession, Company, CompanyAccess)
 
 
 def run_migrations(connection):

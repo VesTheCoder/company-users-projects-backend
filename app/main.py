@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.auth.handlers import router as auth_router
 from app.auth.passwords import PasswordHasherService
+from app.companies.handlers import router as company_router
 from app.config import Settings
 from app.handlers.errors import register_error_handlers
 from app.handlers.middleware import TransportMiddleware
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.include_router(auth_router)
+    app.include_router(company_router)
     register_error_handlers(app)
     app.add_middleware(TransportMiddleware, trusted_hosts=settings.trusted_hosts)
 
