@@ -1,0 +1,31 @@
+{
+  "description": "Cumulative API metrics after the final local sequence, including mixed overload and saturation. Acquisition duration includes connection creation and queue wait.",
+  "docker_cpus": 4,
+  "docker_memory_bytes": 4107522048,
+  "metrics": {
+    "rate_limiter_failures_total": 0.0,
+    "rate_limit_rejections_total": 0.0,
+    "db_pool_timeouts_total": 113.0,
+    "db_pool_in_use": 0.0,
+    "db_pool_capacity": 15.0,
+    "db_pool_acquiring": 0.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.005\"}": 48621.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.01\"}": 48655.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.025\"}": 48760.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.05\"}": 48919.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.075\"}": 49186.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.1\"}": 49615.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.25\"}": 53169.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.5\"}": 56706.0,
+    "db_pool_acquire_seconds_bucket{le=\"0.75\"}": 58660.0,
+    "db_pool_acquire_seconds_bucket{le=\"1.0\"}": 61094.0,
+    "db_pool_acquire_seconds_bucket{le=\"2.5\"}": 67218.0,
+    "db_pool_acquire_seconds_bucket{le=\"5.0\"}": 68285.0,
+    "db_pool_acquire_seconds_bucket{le=\"7.5\"}": 68399.0,
+    "db_pool_acquire_seconds_bucket{le=\"10.0\"}": 68399.0,
+    "db_pool_acquire_seconds_bucket{le=\"+Inf\"}": 68399.0,
+    "db_pool_acquire_seconds_count": 68399.0,
+    "db_pool_acquire_seconds_sum": 18224.006732511334,
+    "db_slow_queries_total": 0.0
+  }
+}
