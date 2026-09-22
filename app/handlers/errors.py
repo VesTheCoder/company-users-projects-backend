@@ -32,6 +32,7 @@ def problem_response(request, status, code, detail, *, headers=None, errors=None
         request_id=getattr(request.state, "request_id", ""),
         errors=errors or [],
     )
+    headers = {"X-Request-ID": body.request_id, **(headers or {})}
     return JSONResponse(
         body.model_dump(),
         status_code=status,
@@ -43,6 +44,10 @@ def problem_response(request, status, code, detail, *, headers=None, errors=None
 def register_error_handlers(app):
     @app.exception_handler(AppError)
     async def application_error(request, error):
+        if error.code == "rate_limit_exceeded":
+            request.app.state.metrics.limiter_rejections.inc()
+        elif error.code == "rate_limiter_unavailable":
+            request.app.state.metrics.limiter_failures.inc()
         return problem_response(
             request, error.status, error.code, error.detail, headers=error.headers
         )
@@ -86,6 +91,8 @@ def register_error_handlers(app):
     @app.exception_handler(DBAPIError)
     @app.exception_handler(TimeoutError)
     async def database_error(request, error):
+        if isinstance(error, TimeoutError):
+            request.app.state.metrics.pool_timeouts.inc()
         return problem_response(
             request,
             503,

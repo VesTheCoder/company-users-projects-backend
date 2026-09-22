@@ -4,6 +4,7 @@ from app.companies.domain import require_role
 from app.companies.models import Company, CompanyAccess
 from app.companies.schemas import AccessRead, CompanyRead
 from app.exceptions.base import AppError
+from app.infrastructure.logging import security_event
 from app.utils.versions import ensure_version
 
 
@@ -81,6 +82,7 @@ async def delete_company(uow, principal, company_id, version):
         delete(Company).where(Company.id == company_id, Company.version == version)
     )
     await uow.commit()
+    security_event("company.deleted", principal, company_id)
 
 
 async def grant_access(uow, principal, company_id, data):
@@ -94,6 +96,7 @@ async def grant_access(uow, principal, company_id, data):
     await uow.session.flush()
     result = access_read(await uow.company_access.read(company_id, data.user_id))
     await uow.commit()
+    security_event("company_access.granted", principal, company_id)
     return result
 
 
@@ -115,6 +118,11 @@ async def change_access(uow, principal, company_id, user_id, role=None):
         await uow.session.refresh(access)
         result = access_read(await uow.company_access.read(company_id, user_id))
     await uow.commit()
+    security_event(
+        "company_access.changed" if role else "company_access.revoked",
+        principal,
+        company_id,
+    )
     return result
 
 
@@ -144,4 +152,5 @@ async def transfer_ownership(uow, principal, company_id, data):
         for identifier in [principal.user_id, data.new_owner_user_id]
     ]
     await uow.commit()
+    security_event("company.ownership_transferred", principal, company_id)
     return result

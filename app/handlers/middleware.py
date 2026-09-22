@@ -25,6 +25,11 @@ class TransportMiddleware:
 
         async def send_with_id(message):
             if message["type"] == "http.response.start":
+                message["headers"] = [
+                    (key, value)
+                    for key, value in message.get("headers", [])
+                    if key != b"x-request-id"
+                ]
                 message.setdefault("headers", []).append(
                     (b"x-request-id", request_id.encode())
                 )

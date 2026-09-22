@@ -5,7 +5,9 @@ from app.auth.csrf import validate_login_csrf
 from app.auth.models import AuthSession
 from app.auth.schemas import CurrentUserRead, LoginRequest, LoginResponse
 from app.auth.services import login
+from app.exceptions.base import AppError
 from app.handlers.dependencies import Principal, Uow
+from app.infrastructure.logging import security_event
 from app.infrastructure.rate_limit import RateLimitCategory
 from app.utils.security import encode_token
 
@@ -25,7 +27,15 @@ async def login_handler(
         response.headers.update(
             await request.app.state.limiter.check(category, subject)
         )
-    result, credential = await login(uow, request.app.state.passwords, data, settings)
+    try:
+        result, credential = await login(
+            uow, request.app.state.passwords, data, settings
+        )
+    except AppError:
+        security_event("auth.login.failed")
+        raise
+    request.state.actor_user_id = result.user.id
+    security_event("auth.login.succeeded")
     response.set_cookie(
         settings.cookie_name,
         credential,
@@ -47,6 +57,7 @@ async def logout(request: Request, response: Response, uow: Uow, principal: Prin
         .values(revoked_at=func.now())
     )
     await uow.commit()
+    security_event("auth.logout", principal)
     settings = request.app.state.settings
     response.delete_cookie(
         settings.cookie_name,
