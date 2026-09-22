@@ -5,11 +5,21 @@ from alembic import context
 from app.auth.models import AuthSession, User
 from app.companies.models import Company, CompanyAccess
 from app.config import Settings
+from app.employees.models import Employee
 from app.infrastructure.database import create_engine
 from app.infrastructure.orm.base import Base
+from app.projects.models import Project, ProjectEmployee
 
 target_metadata = Base.metadata
-registered_models = (User, AuthSession, Company, CompanyAccess)
+registered_models = (
+    User,
+    AuthSession,
+    Company,
+    CompanyAccess,
+    Employee,
+    Project,
+    ProjectEmployee,
+)
 
 
 def run_migrations(connection):
